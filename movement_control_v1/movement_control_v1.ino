@@ -1,10 +1,9 @@
 // minimum unit needed on a pin to get the motor to run
 int motorPower = 160;
-
 // the maximum value of customizable power you can 
 int motorMax = 255 - motorPower;
 
-// clips the customizable motor power within a range, and clips it
+// clips the customizable motor power within a range, and notifies the user if it is out of the allowed range
 void clipPower(int& power){
   if(power < 0 || power > motorMax){
     Serial.println("Invalid Power");
@@ -67,6 +66,17 @@ struct Drivetrain{
     this->right = right;
   }
 
+  void setup(){
+    left.setup();
+    right.setup();
+  }
+
+  // stops the drivetrain
+  void stop(){
+    left.stop();
+    right.stop();
+  }
+
   // moves the chassis forward
   void forward(int power){
     clipPower(power);
@@ -95,26 +105,17 @@ struct Drivetrain{
     right.forward(power);
   }
 };
-
-// the left and right wheel
-Motor left{9, 7, 8};
-Motor right{3, 4, 2};
-
 // the chassis' drivetrain
-Drivetrain drivetrain(left, right);
+Drivetrain drivetrain((Motor) {9, 7, 8}, (Motor) {3, 4, 2});
 
 void setup(){
-  left.setup();
-  right.setup();
+  drivetrain.setup();
   Serial.begin(9600);
 }
 
-int power = motorMax;
 void loop() {
-  left.forward(power);
-  right.forward(power);
+  drivetrain.forward(motorMax);
   delay(1000);
-  left.stop();
-  right.stop();
+  drivetrain.stop();
   delay(1000);
 }
