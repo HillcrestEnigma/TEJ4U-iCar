@@ -4,6 +4,14 @@ int motorPower = 160;
 // the maximum value of customizable power you can 
 int motorMax = 255 - motorPower;
 
+// clips the customizable motor power within a range, and clips it
+void clipPower(int& power){
+  if(power < 0 || power > motorMax){
+    Serial.println("Invalid Power");
+  }
+  power = max(0, min(motorMax, power));
+}
+
 // runs a motor
 struct Motor{
   // control (power) pin, out1 point and out2 pin (for directions)
@@ -19,10 +27,7 @@ struct Motor{
   // moves the motor forward with [power] power
   void forward(int power){
     // notify user if the power is too large and clip it
-    if(power > motorMax || power < 0){
-      Serial.println("invalid power");
-    }
-    power = max(0, min(motorMax, power));
+    clipPower(power);
 
     // write power needed to control
     analogWrite(ctl, 255);
@@ -35,10 +40,7 @@ struct Motor{
   // move the motor backwrad with [power] power
   void backward(int power){
     // notify user if power is out of range and clip it
-    if(power > motorMax || power < 0){
-      Serial.println("invalid power");
-    }
-    power = max(0, min(motorMax, power));
+    clipPower(power);
 
     // write power needed to ctl pin
     analogWrite(ctl, motorPower + power);
@@ -65,18 +67,40 @@ struct Drivetrain{
     this->right = right;
   }
 
+  // moves the chassis forward
   void forward(int power){
-    if(power < 0 || power > motorMax){
-      Serial.println("Invalid Power");
-    }
-    power = max(0, min(motorMax, power));
-    
+    clipPower(power);
+    left.forward(power);
+    right.forward(power);
+  }
+
+  // moves the chassis backward
+  void backward(int power){
+    clipPower(power);
+    left.backward(power);
+    right.backward(power);
+  }
+
+  // rotates the chassis clockwise
+  void clockwise(int power){
+    clipPower(power);
+    left.forward(power);
+    right.backward(power);
+  }
+
+  // rotates the chassis counterclockwise
+  void counterClockwise(int power){
+    clipPoewr(power);
+    left.backward(power);
+    right.forward(power);
   }
 };
 
 // the left and right wheel
 Motor left{9, 7, 8};
 Motor right{3, 4, 2};
+
+// the chassis' drivetrain
 Drivetrain drivetrain(left, right);
 
 void setup(){
