@@ -90,7 +90,7 @@ struct Drivetrain{
 
   // rotates the chassis counterclockwise
   void counterClockwise(int power){
-    clipPoewr(power);
+    clipPower(power);
     left.backward(power);
     right.forward(power);
   }
