@@ -1,0 +1,5 @@
+{
+    "board": "arduino:avr:uno",
+    "sketch": "movement_control_v1\\movement_control_v1.ino",
+    "port": "COM7"
+}

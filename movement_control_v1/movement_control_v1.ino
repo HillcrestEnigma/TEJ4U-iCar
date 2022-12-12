@@ -12,7 +12,7 @@ void clipPower(int& power){
 }
 
 // runs a motor
-struct Motor{
+struct Motor {
   // control (power) pin, out1 point and out2 pin (for directions)
   int ctl, out1, out2;
 
@@ -29,7 +29,7 @@ struct Motor{
     clipPower(power);
 
     // write power needed to control
-    analogWrite(ctl, 255);
+    analogWrite(ctl, motorPower + power);
 
     // set the direction
     digitalWrite(out1, HIGH);
@@ -51,7 +51,7 @@ struct Motor{
 
   // stops the motor
   void stop(){
-    analogWrite(ctl, 0);
+    digitalWrite(ctl, LOW);
   }
 };
 
@@ -105,8 +105,11 @@ struct Drivetrain{
     right.forward(power);
   }
 };
+
+Motor left = {3, 2, 4};
+Motor right = {9, 7, 8};
 // the chassis' drivetrain
-Drivetrain drivetrain((Motor) {9, 7, 8}, (Motor) {3, 4, 2});
+Drivetrain drivetrain(left, right);
 
 void setup(){
   drivetrain.setup();
@@ -114,8 +117,12 @@ void setup(){
 }
 
 void loop() {
-  drivetrain.forward(motorMax);
+  drivetrain.forward(50);
   delay(1000);
-  drivetrain.stop();
+  drivetrain.backward(50);
+  delay(1000);
+  drivetrain.clockwise(50);
+  delay(1000);
+  drivetrain.counterClockwise(50);
   delay(1000);
 }
