@@ -1,4 +1,5 @@
-const int IMPULSE[2] = {255, 255}, SUSTAIN[2] = {140, 140}, STRAIGHT_DELAY=300;
+const int IMPULSE[2] = {255, 255}, SUSTAIN[2] = {150, 160}, STRAIGHT_DELAY=300;
+const int RIGHT_SUSTAIN[2] = {180, 150}, LEFT_SUSTAIN[2] = {150, 180};
 const int DELAY_90 = 500;
 
 // runs a motor
@@ -110,25 +111,17 @@ struct Drivetrain{
     if(mode == 0){
       left.backward(IMPULSE[0]);
       right.forward(IMPULSE[1]);
-    }else {
+    } else {
       Serial.println("invalid CCW mode: " + mode);
-    }
-  }
-
-  // turn [angle] degrees clockwise, make [angle] negative for CCW turns, then stop
-  void turn(int angle){
-    if(angle == 90){
-      clockwise(0);
-      delay(DELAY_90);
-      stop();
     }
   }
 };
 struct PhotoResistor{
   int pin;
-  const int THRESHOLD = 45;
-  PhotoResistor(int pin){
+  int threshold;
+  PhotoResistor(int pin, int threshold){
     this->pin = pin;
+    this->threshold = threshold;
   }
   void setup(){
     pinMode(pin, INPUT);
@@ -137,7 +130,7 @@ struct PhotoResistor{
     return analogRead(pin);
   }
   bool triggered(){
-    return read() >= THRESHOLD;
+    return read() >= threshold;
   }
 };
 
@@ -145,28 +138,22 @@ Motor left = {3, 2, 4};
 Motor right = {9, 7, 8};
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor center(A0);
+PhotoResistor leftRes(A1, 75), rightRes(A0, 80);
+
+void printLights(){
+  Serial.println("LEFT RIGHT");
+  Serial.print(leftRes.read());
+  Serial.print(" ");
+  Serial.println(rightRes.read());
+}
 
 void setup(){
   drivetrain.setup();
-  center.setup();
+  leftRes.setup();
+  rightRes.setup();
   Serial.begin(9600);
-  drivetrain.forward(-1);
 }
 
-bool stopped = false;
 void loop() {
-  Serial.println(center.read());
-  if(!center.triggered() && !stopped){
-    stopped = true;
-    delay(50);
-    drivetrain.backward(0);
-    delay(10);
-    drivetrain.stop();
-    delay(500);
-    drivetrain.turn(90);
-    delay(1000);
-    drivetrain.forward(-1);
-    stopped = false;
-  }
+   drivetrain.forward(-1);
 }
