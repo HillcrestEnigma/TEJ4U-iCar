@@ -1,6 +1,7 @@
-const int IMPULSE[2] = {255, 255}, SUSTAIN[2] = {150, 160}, STRAIGHT_DELAY=300;
-const int RIGHT_SUSTAIN[2] = {180, 150}, LEFT_SUSTAIN[2] = {150, 180};
+const int IMPULSE[2] = {80, 80}, SUSTAIN[2] = {40, 40}, STRAIGHT_DELAY=300;
+const int RIGHT_SUSTAIN[2] = {50, 40}, LEFT_SUSTAIN[2] = {40, 50};
 const int DELAY_90 = 500;
+const int WAIT=-1, FORWARD_STATE = 0, TILT_RIGHT = 1, TILT_LEFT = 2, TURN_LEFT = 3, TURN_RIGHT = 4;
 
 // runs a motor
 struct Motor {
@@ -8,7 +9,11 @@ struct Motor {
   int ctl, out1, out2;
 
   // sets up the relevant pins
-  void setup(){
+  Motor(int ctl, int out1, int out2) {
+    this->ctl = ctl;
+    this->out1 = out1;
+    this->out2 = out2;
+
     pinMode(ctl, OUTPUT);
     pinMode(out1, OUTPUT);
     pinMode(out2, OUTPUT);
@@ -41,7 +46,7 @@ struct Motor {
 };
 
 // A drivetrain configuring both motors
-struct Drivetrain{
+struct Drivetrain {
   // left and right motors
   Motor left, right;
 
@@ -49,9 +54,7 @@ struct Drivetrain{
   Drivetrain(Motor left, Motor right){
     this->left = left;
     this->right = right;
-  }
 
-  void setup(){
     left.setup();
     right.setup();
   }
@@ -62,18 +65,32 @@ struct Drivetrain{
     right.stop();
   }
 
-  // moves the chassis forward, should be called once at the start of the movement
+  /* moves the chassis forward
+      mode -1: an initial impulse to get motors moving
+      mode 0: normal forward fast
+      mode 1: moves forward slowly
+      mode 2: moves to the right a bit
+      mode 3: moves to the left a bit
+  */
+  static const int FORWARD = 1, LEFT = 3, RIGHT = 2;
   void forward(int mode){
-    if(mode == 0){
-      left.forward(IMPULSE[0]);
-      right.forward(IMPULSE[1]);
-    } else if(mode == -1){
-      // slow - adds voltage for momentum, then goes at a slow pace
+    if(mode == -1){
       left.forward(IMPULSE[0]);
       right.forward(IMPULSE[1]);
       delay(STRAIGHT_DELAY);
+    } else if(mode == 0){
+      left.forward(IMPULSE[0]);
+      right.forward(IMPULSE[1]);
+    } else if(mode == FORWARD){
+      // slow - adds voltage for momentum, then goes at a slow pace
       left.forward(SUSTAIN[0]);
       right.forward(SUSTAIN[1]);
+    } else if(mode == RIGHT){
+      left.forward(RIGHT_SUSTAIN[0]);
+      right.forward(RIGHT_SUSTAIN[1]);
+    } else if(mode == LEFT){
+      left.forward(LEFT_SUSTAIN[0]);
+      right.forward(LEFT_SUSTAIN[1]);
     } else {
       Serial.println("invalid forward mode: " + mode);
     } 
@@ -116,35 +133,64 @@ struct Drivetrain{
     }
   }
 };
+
 struct PhotoResistor{
+  const static int NUM_RECORD = 3, RECORD_DELAY = 10;
   int pin;
   int threshold;
+
+  int prev[NUM_RECORD];
+
+  int lasRecord;
   PhotoResistor(int pin, int threshold){
     this->pin = pin;
     this->threshold = threshold;
+    lasRecord = 0;
   }
   void setup(){
     pinMode(pin, INPUT);
   }
   int read(){
-    return analogRead(pin);
+    if(millis() - lasRecord > RECORD_DELAY){
+      for(int i = 0; i < NUM_RECORD - 1; ++i) prev[i] = prev[i + 1];
+      prev[NUM_RECORD - 1] = analogRead(pin);
+      lasRecord = millis();
+    }
+    int tot = 0;
+    for(int i : prev) tot += i;
+    return tot / NUM_RECORD;
   }
   bool triggered(){
     return read() >= threshold;
   }
 };
 
+struct SensorArray {
+  PhotoResistor left, centre, right;
+
+  SensorArray(PhotoResistor left, PhotoResistor centre, PhotoResistor right){
+    this->left = left;
+    this->centre = centre;
+    this->right = right;
+  }
+}
+
+struct Car {
+};
+
 Motor left = {3, 2, 4};
 Motor right = {9, 7, 8};
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor leftRes(A1, 75), rightRes(A0, 80);
+PhotoResistor leftRes(A2, 200), centerRes(A0, 60), rightRes(A1, 60);
 
 void printLights(){
-  Serial.println("LEFT RIGHT");
-  Serial.print(leftRes.read());
+  Serial.println("LEFT CENTER RIGHT");
+  Serial.print(leftRes.triggered());
   Serial.print(" ");
-  Serial.println(rightRes.read());
+  Serial.print(centerRes.triggered());
+  Serial.print(" ");
+  Serial.println(rightRes.triggered());
 }
 
 void setup(){
@@ -154,6 +200,24 @@ void setup(){
   Serial.begin(9600);
 }
 
+int state = -1;
+const int WAIT=-1, FORWARD_STATE = 0, TILT_RIGHT = 1, TILT_LEFT = 2, TURN_LEFT = 3, TURN_RIGHT = 4;
 void loop() {
-   drivetrain.forward(-1);
+  printLights();
+  if (state == WAIT) {
+    if (millis() > 200 && leftRes.triggered() && rightRes.triggered() && !centerRes.triggered()) {
+      drivetrain.forward(-1);
+      state = FORWARD_STATE;
+    }
+  } else if(state == FORWARD_STATE){
+    drivetrain.forward(Drivetrain::FORWARD);
+    if(!leftRes.triggered()) state = TILT_LEFT;
+    if(!rightRes.triggered()) state = TILT_RIGHT;
+  } else if(state == TILT_RIGHT){
+    drivetrain.forward(Drivetrain::RIGHT);
+    if(!centerRes.triggered()) state = FORWARD_STATE;
+  } else if(state == TILT_LEFT){
+    drivetrain.forward(Drivetrain::LEFT);
+    if(!centerRes.triggered()) state = FORWARD_STATE;
+  }
 }
