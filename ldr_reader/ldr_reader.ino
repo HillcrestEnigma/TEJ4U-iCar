@@ -1,13 +1,9 @@
-// impulse power, forward sustain, turn sustain
-const int IMPULSE_POWER[2] = {80, 80}, SUSTAIN_POWER[2] = {40, 40}, TURN_POWER[2] = {50, 50};
-// impulse delays
-const int STRAIGHT_DELAY=100, TURN_DELAY=100;
-// tilt sustain powers
-const int RIGHT_SUSTAIN_POWER[2] = {60, 35}, LEFT_SUSTAIN_POWER[2] = {35, 60};
-// states
-const int WAIT=-1, FORWARD_STATE = 0, FORWARD_TILL_HIT = 6, TILT_RIGHT = 1, TILT_LEFT = 2, LEFT_CORNER = 3, RIGHT_CORNER = 4, TEST_OFF = 5;
-// the buffer for when we're off before we start turning left
-const int OFF_BUFFER = 1000;
+const int IMPULSE_POWER[2] = {80, 80}, SUSTAIN_POWER[2] = {40, 40}, TURN_POWER[2] = {60, 60}, STRAIGHT_DELAY=300;
+const int RIGHT_SUSTAIN_POWER[2] = {50, 40}, LEFT_SUSTAIN_POWER[2] = {40, 50};
+const int DELAY_90 = 500;
+const int WAIT=-1, FORWARD_STATE = 0, TILT_RIGHT = 1, TILT_LEFT = 2, LEFT_CORNER = 3, RIGHT_CORNER = 4, TEST_OFF = 5;
+
+const int OFF_BUFFER = 100;
 
 // runs a motor
 struct Motor {
@@ -115,17 +111,9 @@ struct Drivetrain {
     }
   }
 
-  static const int LOW_TURN=4;
-  /* rotates the chassis clockwise
-   *  IMPULSE: a synchronous initial impulse to get motors up to speed
-   *  LOW_TURN: a slow turn
-   */
+  // rotates the chassis clockwise
   void clockwise(int mode){
-    if(mode == IMPULSE){
-      left.forward(IMPULSE_POWER[0]);
-      right.backward(IMPULSE_POWER[1]);
-      delay(TURN_DELAY);
-    } else if(mode == LOW_TURN){
+    if(mode == 0){
       left.forward(TURN_POWER[0]);
       right.backward(TURN_POWER[1]);
     } else {
@@ -133,17 +121,9 @@ struct Drivetrain {
     }
   }
 
-  /*
-   * Rotates the car CCW
-   * IMPULSE: a synchronous initial impulse to get motors up to speed
-   * LOW_TURN: a slow turn
-   */
+  // rotates the chassis counterclockwise
   void counterClockwise(int mode){
-    if(mode == IMPULSE) {
-      left.backward(IMPULSE_POWER[0]);
-      right.forward(IMPULSE_POWER[1]);
-      delay(TURN_DELAY);
-    } else if(mode == LOW_TURN){
+    if(mode == 0){
       left.backward(TURN_POWER[0]);
       right.forward(TURN_POWER[1]);
     } else {
@@ -204,26 +184,16 @@ Motor left(3, 2, 4);
 Motor right(9, 7, 8);
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor leftRes(A2, 100), centerRes(A0, 75), rightRes(A1, 120);
+PhotoResistor leftRes(A2, 145), centerRes(A0, 5), rightRes(A1, 120);
 SensorArray sensors(leftRes, centerRes, rightRes);
 
 void printLights(){
-  Serial.print(leftRes.triggered());
+  Serial.println("LEFT CENTER RIGHT");
+  Serial.print(leftRes.read());
   Serial.print(" ");
-  Serial.print(centerRes.triggered());
+  Serial.print(centerRes.read());
   Serial.print(" ");
-  Serial.print(rightRes.triggered());
-}
-
-String stateType(int state){
-  if(state == WAIT) return "wait";
-  if(state == FORWARD_STATE) return "forward";
-  if(state == TILT_LEFT) return "tilt left";
-  if(state == TILT_RIGHT) return "tilt right";
-  if(state == RIGHT_CORNER) return "turn right";
-  if(state == LEFT_CORNER) return "turn left";
-  if(state == TEST_OFF) return "all white";
-  if(state == FORWARD_TILL_HIT) return "forward till hit";
+  Serial.println(rightRes.read());
 }
 
 void setup(){
@@ -236,72 +206,4 @@ int state = -1;
 int offTime = 0;
 void loop() {
   printLights();
-  Serial.print(" ");
-  Serial.println(stateType(state));
-  if (state == WAIT) {
-    // waiting to be in a good starting position
-    if (millis() > 200 && leftRes.triggered() && rightRes.triggered() && !centerRes.triggered()) {
-      drivetrain.forward(Drivetrain::IMPULSE);
-      state = FORWARD_STATE;
-    }
-  } else if(state == FORWARD_STATE){
-    // moving forwards
-    drivetrain.forward(Drivetrain::RIGHT);
-
-    // if the left side on line, tilt left
-    if(!leftRes.triggered()) state = TILT_LEFT;
-    if(!rightRes.triggered()) {
-      // if right side on line
-      if(!centerRes.triggered()) {
-        drivetrain.clockwise(Drivetrain::IMPULSE);
-        state = RIGHT_CORNER;
-      }
-      else state = TILT_RIGHT;
-    }
-
-    // once we're off
-    if(leftRes.triggered() && rightRes.triggered() && centerRes.triggered()){
-      state = TEST_OFF;
-      offTime = millis();
-    }
-  } else if(state == TILT_RIGHT){
-    // tilt right
-    drivetrain.forward(Drivetrain::RIGHT);
-
-    // if center on line, move forward
-    if(!centerRes.triggered()) state = FORWARD_STATE;
-  } else if(state == TILT_LEFT){
-    // tilt left
-    drivetrain.forward(Drivetrain::LEFT);
-    // if center on line, move forward
-    if(!leftRes.triggered()) state = FORWARD_STATE;
-    if(leftRes.triggered() && rightRes.triggered() && centerRes.triggered()){
-      state = TEST_OFF;
-      offTime = millis();
-    }
-  } else if(state == RIGHT_CORNER){
-    // turn right
-    drivetrain.clockwise(Drivetrain::LOW_TURN);
-
-    // if center is off the line, then continue moving forward until we're back on track
-    if(centerRes.triggered() && !leftRes.triggered()) {
-      drivetrain.forward(Drivetrain::IMPULSE);
-      state = FORWARD_STATE;
-    }
-  } else if(state == LEFT_CORNER){
-    drivetrain.counterClockwise(Drivetrain::LOW_TURN);
-    if(!centerRes.triggered()) {
-      drivetrain.forward(Drivetrain::IMPULSE);
-      state = FORWARD_STATE;
-    }
-  } else if(state == TEST_OFF){
-    drivetrain.forward(Drivetrain::LEFT);
-    if(millis() - offTime > OFF_BUFFER) {
-      drivetrain.counterClockwise(Drivetrain::IMPULSE);
-      state = LEFT_CORNER;
-    }
-    if(!centerRes.triggered()){
-      state = FORWARD_STATE;
-    }
-  }
 }

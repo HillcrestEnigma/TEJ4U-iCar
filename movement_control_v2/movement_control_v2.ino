@@ -1,9 +1,9 @@
 // impulse power, forward sustain, turn sustain
-const int IMPULSE_POWER[2] = {80, 80}, SUSTAIN_POWER[2] = {40, 40}, TURN_POWER[2] = {50, 50};
+const int IMPULSE_POWER[2] = {90, 90}, SUSTAIN_POWER[2] = {40, 40}, TURN_POWER[2] = {60, 60};
 // impulse delays
-const int STRAIGHT_DELAY=100, TURN_DELAY=100;
+const int STRAIGHT_DELAY=200, TURN_DELAY=100;
 // tilt sustain powers
-const int RIGHT_SUSTAIN_POWER[2] = {60, 35}, LEFT_SUSTAIN_POWER[2] = {35, 60};
+const int RIGHT_SUSTAIN_POWER[2] = {60, 40}, LEFT_SUSTAIN_POWER[2] = {40, 60};
 // states
 const int WAIT=-1, FORWARD_STATE = 0, FORWARD_TILL_HIT = 6, TILT_RIGHT = 1, TILT_LEFT = 2, LEFT_CORNER = 3, RIGHT_CORNER = 4, TEST_OFF = 5;
 // the buffer for when we're off before we start turning left
@@ -204,7 +204,7 @@ Motor left(3, 2, 4);
 Motor right(9, 7, 8);
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor leftRes(A2, 100), centerRes(A0, 75), rightRes(A1, 120);
+PhotoResistor leftRes(A2, 155), centerRes(A0, 130), rightRes(A1, 120);
 SensorArray sensors(leftRes, centerRes, rightRes);
 
 void printLights(){
@@ -240,16 +240,17 @@ void loop() {
   Serial.println(stateType(state));
   if (state == WAIT) {
     // waiting to be in a good starting position
-    if (millis() > 200 && leftRes.triggered() && rightRes.triggered() && !centerRes.triggered()) {
+    if (millis() > 200 && !leftRes.triggered() && rightRes.triggered() && !centerRes.triggered()) {
       drivetrain.forward(Drivetrain::IMPULSE);
       state = FORWARD_STATE;
     }
   } else if(state == FORWARD_STATE){
     // moving forwards
-    drivetrain.forward(Drivetrain::RIGHT);
+    drivetrain.forward(Drivetrain::FORWARD);
 
     // if the left side on line, tilt left
-    if(!leftRes.triggered()) state = TILT_LEFT;
+    if(centerRes.triggered()) state = TILT_LEFT;
+    if(leftRes.triggered()) state = TILT_RIGHT;
     if(!rightRes.triggered()) {
       // if right side on line
       if(!centerRes.triggered()) {
@@ -261,7 +262,7 @@ void loop() {
 
     // once we're off
     if(leftRes.triggered() && rightRes.triggered() && centerRes.triggered()){
-      state = TEST_OFF;
+      state = LEFT_CORNER;
       offTime = millis();
     }
   } else if(state == TILT_RIGHT){
@@ -270,13 +271,20 @@ void loop() {
 
     // if center on line, move forward
     if(!centerRes.triggered()) state = FORWARD_STATE;
+    // once we're off
+    if(leftRes.triggered() && rightRes.triggered() && centerRes.triggered()){
+      state = LEFT_CORNER;
+      offTime = millis();
+    }
   } else if(state == TILT_LEFT){
     // tilt left
     drivetrain.forward(Drivetrain::LEFT);
     // if center on line, move forward
-    if(!leftRes.triggered()) state = FORWARD_STATE;
+    if(!centerRes.triggered()) state = FORWARD_STATE;
+
+    // once we're off
     if(leftRes.triggered() && rightRes.triggered() && centerRes.triggered()){
-      state = TEST_OFF;
+      state = LEFT_CORNER;
       offTime = millis();
     }
   } else if(state == RIGHT_CORNER){
