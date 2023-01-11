@@ -1,13 +1,7 @@
 // impulse power, forward sustain, turn sustain
-const int IMPULSE_POWER[2] = {120, 120}, SUSTAIN_POWER[2] = {40, 40}, TURN_POWER[2] = {110, 110};
-// impulse delays
-const int STRAIGHT_DELAY=200, TURN_DELAY=100;
+const int FAST_POWER[2] = {200, 200}, SLOW_POWER[2] = {140, 140}, TURN_POWER[2] = {200, 200};
 // tilt sustain powers
-const int RIGHT_SUSTAIN_POWER[2] = {80, 30}, LEFT_SUSTAIN_POWER[2] = {30, 80};
-// states
-const int WAIT=-1, FORWARD_STATE = 0, FORWARD_TILL_HIT = 6, TILT_RIGHT = 1, TILT_LEFT = 2, LEFT_CORNER = 3, RIGHT_CORNER = 4, TEST_OFF = 5;
-// the buffer for when we're off before we start turning left
-const int OFF_BUFFER = 1000;
+const int RIGHT_SUSTAIN_POWER[2] = {110, 70}, LEFT_SUSTAIN_POWER[2] = {130, 170};
 
 // runs a motor
 struct Motor {
@@ -74,24 +68,20 @@ struct Drivetrain {
       mode 2: moves to the right a bit
       mode 3: moves to the left a bit
   */
-  static const int IMPULSE = -1, FORWARD_FAST = 0, FORWARD = 1, LEFT = 2, RIGHT = 3;
+  static const int FORWARD_FAST = 0, FORWARD = 1, LEFT = 2, RIGHT = 3;
   void forward(int mode){
-    if (mode == IMPULSE) {
-      left.forward(IMPULSE_POWER[0]);
-      right.forward(IMPULSE_POWER[1]);
-      delay(STRAIGHT_DELAY);
-    } else if(mode == FORWARD_FAST){
-      left.forward(IMPULSE_POWER[0]);
-      right.forward(IMPULSE_POWER[1]);
+    if(mode == FORWARD_FAST){
+      left.forward(FAST_POWER[0]);
+      right.forward(FAST_POWER[1]);
     } else if(mode == FORWARD){
       // slow - adds voltage for momentum, then goes at a slow pace
-      left.forward(SUSTAIN_POWER[0]);
-      right.forward(SUSTAIN_POWER[1]);
+      left.forward(SLOW_POWER[0]);
+      right.forward(SLOW_POWER[1]);
     } else if(mode == RIGHT){
       left.forward(RIGHT_SUSTAIN_POWER[0]);
-      right.forward(RIGHT_SUSTAIN_POWER[1]);
+      right.backward(RIGHT_SUSTAIN_POWER[1]);
     } else if(mode == LEFT){
-      left.forward(LEFT_SUSTAIN_POWER[0]);
+      left.backward(LEFT_SUSTAIN_POWER[0]);
       right.forward(LEFT_SUSTAIN_POWER[1]);
     } else {
       Serial.println("invalid forward mode: " + mode);
@@ -101,33 +91,25 @@ struct Drivetrain {
   // moves the chassis backward, should be called once at the start of the movement
   void backward(int mode){
     if (mode == 0) {
-      left.backward(IMPULSE_POWER[0]);
-      right.backward(IMPULSE_POWER[1]);
-    } else if (mode == -1) {
-      // slow - adds voltage for momentum, then goes at a slow pace
-      left.backward(IMPULSE_POWER[0]);
-      right.backward(IMPULSE_POWER[1]);
-      delay(STRAIGHT_DELAY);
-      left.backward(SUSTAIN_POWER[0]);
-      right.backward(SUSTAIN_POWER[1]);
+      left.backward(FAST_POWER[0]);
+      right.backward(FAST_POWER[1]);
     } else {
       Serial.println("invalid backward mode: " + mode);
     }
   }
 
-  static const int LOW_TURN=4;
+  static const int LOW_TURN=4, HIGH_TURN=5;
   /* rotates the chassis clockwise
    *  IMPULSE: a synchronous initial impulse to get motors up to speed
    *  LOW_TURN: a slow turn
    */
   void clockwise(int mode){
-    if(mode == IMPULSE){
-      left.forward(IMPULSE_POWER[0]);
-      right.backward(IMPULSE_POWER[1]);
-      delay(TURN_DELAY);
-    } else if(mode == LOW_TURN){
+    if(mode == LOW_TURN){
       left.forward(TURN_POWER[0]);
       right.backward(TURN_POWER[1]);
+    } else if(mode == HIGH_TURN){
+      left.forward(SLOW_POWER[0]);
+      right.backward(SLOW_POWER[1]);
     } else {
       Serial.println("invalid CW mode: " + mode);
     }
@@ -139,13 +121,12 @@ struct Drivetrain {
    * LOW_TURN: a slow turn
    */
   void counterClockwise(int mode){
-    if(mode == IMPULSE) {
-      left.backward(IMPULSE_POWER[0]);
-      right.forward(IMPULSE_POWER[1]);
-      delay(TURN_DELAY);
-    } else if(mode == LOW_TURN){
+    if(mode == LOW_TURN){
       left.backward(TURN_POWER[0]);
       right.forward(TURN_POWER[1]);
+    } else if(mode == HIGH_TURN){
+      left.backward(SLOW_POWER[0]);
+      right.forward(SLOW_POWER[1]);
     } else {
       Serial.println("invalid CCW mode: " + mode);
     }
@@ -156,16 +137,24 @@ struct PhotoResistor{
   const static int NUM_RECORD = 3, RECORD_DELAY = 10;
   int pin;
   int threshold;
-
   int prev[NUM_RECORD];
-
   int lasRecord;
+
+  long threshSum, readings;
   PhotoResistor(int pin, int threshold){
     this->pin = pin;
     this->threshold = threshold;
     this->lasRecord = 0;
+    this->threshSum = 0;
+    this->readings = 0;
 
     pinMode(pin, INPUT);
+  }
+
+  void threshRead(){
+    threshSum += analogRead(pin);
+    readings += 1;
+    threshold = threshSum / readings - 30;
   }
 
   int read(){
@@ -178,68 +167,55 @@ struct PhotoResistor{
     for(int i : prev) tot += i;
     return tot / NUM_RECORD;
   }
+
   bool triggered(){
     return read() >= threshold;
   }
-};
-
-struct SensorArray {
-  PhotoResistor left, centre, right;
-
-  SensorArray(PhotoResistor& left, PhotoResistor& centre, PhotoResistor& right): left(left), centre(centre), right(right) {}
-  
-  // int& read(){
-  //   return {left.read(), centre.read(), right.read()};
-  // }
-};
-
-struct Car {
-  Drivetrain drivetrain;
-  SensorArray sensors;
-
-  Car(Drivetrain& drivetrain, SensorArray& sensors): drivetrain(drivetrain), sensors(sensors) {}
 };
 
 Motor left(3, 2, 4);
 Motor right(9, 7, 8);
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor leftRes(A2, 155), centerRes(A0, 80), rightRes(A1, 120);
-SensorArray sensors(leftRes, centerRes, rightRes);
+PhotoResistor frontRes(A2, 180), centerRes(A0, 70), rightRes(A1, 120);
 
 void printLights(){
-  Serial.print(leftRes.triggered());
+  Serial.print(frontRes.read());
   Serial.print(" ");
   Serial.print(centerRes.read());
   Serial.print(" ");
-  Serial.print(rightRes.triggered());
-}
-
-String stateType(int state){
-  if(state == WAIT) return "wait";
-  if(state == FORWARD_STATE) return "forward";
-  if(state == TILT_LEFT) return "tilt left";
-  if(state == TILT_RIGHT) return "tilt right";
-  if(state == RIGHT_CORNER) return "turn right";
-  if(state == LEFT_CORNER) return "turn left";
-  if(state == TEST_OFF) return "all white";
-  if(state == FORWARD_TILL_HIT) return "forward till hit";
+  Serial.print(rightRes.read());
 }
 
 void setup(){
   Serial.begin(9600);
+
+  for(int i = 0; i < 100; i++){
+    frontRes.threshRead();
+    centerRes.threshRead();
+    rightRes.threshRead();
+    delay(10);
+  }
+
+  Serial.print(frontRes.threshold);
+  Serial.print(" ");
+  Serial.print(centerRes.threshold);
+  Serial.print(" ");
+  Serial.println(rightRes.threshold);
 }
 
-int state = -1;
-
-// the time at which car went off line
-int offTime = 0;
 void loop() {
   printLights();
   Serial.println();
-  if(!centerRes.triggered()){
+  
+  if(!frontRes.triggered()){
     drivetrain.clockwise(Drivetrain::LOW_TURN);
   } else {
+    // if the center sensor is not triggered, the car is off the line
     drivetrain.forward(Drivetrain::LEFT);
+  }
+
+  if(!frontRes.triggered() && !frontRes.triggered()){
+    delay(50);
   }
 }

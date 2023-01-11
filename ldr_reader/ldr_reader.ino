@@ -184,7 +184,7 @@ Motor left(3, 2, 4);
 Motor right(9, 7, 8);
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor leftRes(A2, 145), centerRes(A0, 5), rightRes(A1, 120);
+PhotoResistor leftRes(A2, 180), centerRes(A0, 120), rightRes(A1, 120);
 SensorArray sensors(leftRes, centerRes, rightRes);
 
 void printLights(){
