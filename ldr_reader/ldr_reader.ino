@@ -1,4 +1,4 @@
-const int IMPULSE_POWER[2] = {80, 80}, SUSTAIN_POWER[2] = {40, 40}, TURN_POWER[2] = {60, 60}, STRAIGHT_DELAY=300;
+const int IMPULSE_POWER[2] = {160, 160}, SUSTAIN_POWER[2] = {80, 80}, TURN_POWER[2] = {60, 60}, STRAIGHT_DELAY=300;
 const int RIGHT_SUSTAIN_POWER[2] = {50, 40}, LEFT_SUSTAIN_POWER[2] = {40, 50};
 const int DELAY_90 = 500;
 const int WAIT=-1, FORWARD_STATE = 0, TILT_RIGHT = 1, TILT_LEFT = 2, LEFT_CORNER = 3, RIGHT_CORNER = 4, TEST_OFF = 5;
@@ -184,7 +184,7 @@ Motor left(3, 2, 4);
 Motor right(9, 7, 8);
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor leftRes(A2, 180), centerRes(A0, 120), rightRes(A1, 120);
+PhotoResistor leftRes(A1, 55), centerRes(A2, 55), rightRes(A0, 55);
 SensorArray sensors(leftRes, centerRes, rightRes);
 
 void printLights(){
@@ -206,4 +206,5 @@ int state = -1;
 int offTime = 0;
 void loop() {
   printLights();
+  drivetrain.forward(Drivetrain::FORWARD);
 }

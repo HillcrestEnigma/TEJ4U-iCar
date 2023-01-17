@@ -1,7 +1,7 @@
 // impulse power, forward sustain, turn sustain
-const int FAST_POWER[2] = {200, 200}, SLOW_POWER[2] = {140, 140}, TURN_POWER[2] = {200, 200};
+const int FAST_POWER[2] = {160, 160}, SLOW_POWER[2] = {140, 140}, TURN_POWER[2] = {120, 120};
 // tilt sustain powers
-const int RIGHT_SUSTAIN_POWER[2] = {110, 70}, LEFT_SUSTAIN_POWER[2] = {130, 170};
+const int RIGHT_SUSTAIN_POWER[2] = {220, -180}, LEFT_SUSTAIN_POWER[2] = {0, 120}, LEFT_FASTER[2] = {-70, 90};
 
 // runs a motor
 struct Motor {
@@ -21,6 +21,10 @@ struct Motor {
 
   // moves the motor forward with [power] power
   void forward(int power){
+    if(power < 0){
+      backward(-power);
+      return;
+    }
     // write power needed to control
     analogWrite(ctl, power);
 
@@ -31,6 +35,11 @@ struct Motor {
 
   // move the motor backwrad with [power] power
   void backward(int power){
+    if(power < 0){
+      forward(-power);
+      return;
+    }
+    Serial.println("back");
     // write power needed to ctl pin
     analogWrite(ctl, power);
 
@@ -61,6 +70,11 @@ struct Drivetrain {
     right.stop();
   }
 
+  void drive(int lef, int rig){
+    left.forward(lef);
+    right.forward(rig);
+  }
+  
   /* moves the chassis forward
       mode -1: an initial impulse to get motors moving
       mode 0: normal forward fast
@@ -79,9 +93,9 @@ struct Drivetrain {
       right.forward(SLOW_POWER[1]);
     } else if(mode == RIGHT){
       left.forward(RIGHT_SUSTAIN_POWER[0]);
-      right.backward(RIGHT_SUSTAIN_POWER[1]);
+      right.forward(RIGHT_SUSTAIN_POWER[1]);
     } else if(mode == LEFT){
-      left.backward(LEFT_SUSTAIN_POWER[0]);
+      left.forward(LEFT_SUSTAIN_POWER[0]);
       right.forward(LEFT_SUSTAIN_POWER[1]);
     } else {
       Serial.println("invalid forward mode: " + mode);
@@ -177,10 +191,10 @@ Motor left(3, 2, 4);
 Motor right(9, 7, 8);
 // the chassis' drivetrain
 Drivetrain drivetrain(left, right);
-PhotoResistor frontRes(A2, 180), centerRes(A0, 70), rightRes(A1, 120);
+PhotoResistor leftRes(A2, 180), centerRes(A0, 70), rightRes(A1, 120);
 
 void printLights(){
-  Serial.print(frontRes.read());
+  Serial.print(leftRes.read());
   Serial.print(" ");
   Serial.print(centerRes.read());
   Serial.print(" ");
@@ -191,31 +205,37 @@ void setup(){
   Serial.begin(9600);
 
   for(int i = 0; i < 100; i++){
-    frontRes.threshRead();
+    leftRes.threshRead();
     centerRes.threshRead();
     rightRes.threshRead();
     delay(10);
   }
 
-  Serial.print(frontRes.threshold);
+  Serial.print(leftRes.threshold);
   Serial.print(" ");
   Serial.print(centerRes.threshold);
   Serial.print(" ");
   Serial.println(rightRes.threshold);
 }
 
+int cur = 0;
+int las = 0;
+int buff = 100;
 void loop() {
   printLights();
   Serial.println();
-  
-  if(!frontRes.triggered()){
+
+  if(!centerRes.triggered()){
     drivetrain.clockwise(Drivetrain::LOW_TURN);
+    cur = LEFT_SUSTAIN_POWER[0];
+    las = millis();
   } else {
     // if the center sensor is not triggered, the car is off the line
-    drivetrain.forward(Drivetrain::LEFT);
+    if(millis() - las >= buff){
+      drivetrain.drive(LEFT_FASTER[0], LEFT_FASTER[1]);
+    } else {
+      drivetrain.drive(LEFT_SUSTAIN_POWER[0], LEFT_SUSTAIN_POWER[1]); 
+    }
   }
-
-  if(!frontRes.triggered() && !frontRes.triggered()){
-    delay(50);
-  }
+  delay(40);
 }
