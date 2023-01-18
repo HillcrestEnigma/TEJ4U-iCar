@@ -91,7 +91,7 @@ struct PhotoResistor{
   void threshRead(){
     threshSum += analogRead(pin);
     readings += 1;
-    threshold = threshSum / readings - 40;
+    threshold = threshSum / readings - 20;
   }
 
   int read(){
@@ -117,11 +117,11 @@ Drivetrain drivetrain(left, right);
 PhotoResistor leftRes(A1, 55), centerRes(A2, 55), rightRes(A0, 55);
 
 void printLights(){
-  Serial.print(leftRes.triggered());
+  Serial.print(leftRes.read());
   Serial.print(" ");
-  Serial.print(centerRes.triggered());
+  Serial.print(centerRes.read());
   Serial.print(" ");
-  Serial.println(rightRes.triggered());
+  Serial.println(rightRes.read());
 }
 
 void setup(){
@@ -135,14 +135,26 @@ void setup(){
   }
 }
 
-int TURN = 90, FORWARD_FAST = 80, FORWARD_SLOW = 40;
+int TURN = 80, FORWARD_FAST = 70, FORWARD_SLOW = 60;
+const int CHANGE_DELAY = 0;
+int lasTurn = 0; // -1 for left, 1 for right, 0 for neither
+int turnStart = 0;
 void loop() {
   printLights();
   if(centerRes.triggered() && leftRes.triggered() && rightRes.triggered()){
-    drivetrain.drive(-TURN, TURN);
+    if(lasTurn != 1 || millis() - turnStart >= CHANGE_DELAY){
+      drivetrain.drive(-TURN, TURN); 
+      if(lasTurn != -1) turnStart = millis();
+      lasTurn = -1;
+    }
     Serial.println("left");
   } else if(!rightRes.triggered()){
     drivetrain.drive(TURN, -TURN);
+    if(lasTurn != -1 || millis() - turnStart >= CHANGE_DELAY){
+      drivetrain.drive(TURN, -TURN);
+      if(lasTurn != 1) turnStart = millis();
+      lasTurn = 1;
+    }
     Serial.println("right");
   } else if(leftRes.triggered()){
     drivetrain.drive(FORWARD_FAST, FORWARD_SLOW);
@@ -154,4 +166,5 @@ void loop() {
     drivetrain.drive(FORWARD_FAST, FORWARD_FAST);
     Serial.println("forward");
   }
+  delay(10);
 }

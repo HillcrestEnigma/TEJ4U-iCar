@@ -3,7 +3,7 @@ struct Motor {
   // control (power) pin, out1 point and out2 pin (for directions)
   int ctl, out1, out2;
 
-  static const int IMP_TIME=100, IMP_AMT=100;
+  static const int IMP_TIME=60, IMP_AMT=140;
   int lasDir, impStart;
 
   // sets up the relevant pins
@@ -153,14 +153,26 @@ void setup(){
   }
 }
 
-int TURN = 90, FORWARD_FAST = 80, FORWARD_SLOW = 40;
+int TURN = 80, FORWARD_FAST = 90, FORWARD_SLOW = 70;
+const int CHANGE_DELAY = 70;
+int lasTurn = 0; // -1 for left, 1 for right, 0 for neither
+int turnStart = 0;
 void loop() {
   printLights();
   if(centerRes.triggered() && leftRes.triggered() && rightRes.triggered()){
-    drivetrain.drive(-TURN, TURN);
+    if(lasTurn != 1 || millis() - turnStart >= CHANGE_DELAY){
+      drivetrain.drive(-TURN, TURN); 
+      if(lasTurn != -1) turnStart = millis();
+      lasTurn = -1;
+    }
     Serial.println("left");
   } else if(!rightRes.triggered()){
     drivetrain.drive(TURN, -TURN);
+    if(lasTurn != -1 || millis() - turnStart >= CHANGE_DELAY){
+      drivetrain.drive(TURN, -TURN);
+      if(lasTurn != 1) turnStart = millis();
+      lasTurn = 1;
+    }
     Serial.println("right");
   } else if(leftRes.triggered()){
     drivetrain.drive(FORWARD_FAST, FORWARD_SLOW);
